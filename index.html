@@ -47,17 +47,28 @@
         }
     </style>
     <script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
         
         setLogLevel('Debug');
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         
+        // --- API Keys & Configuration ---
+        // Your Google Places API key.
         const GOOGLE_PLACES_API_KEY = 'AIzaSyAyh7Ik2dnRJsgwvBtiKX-rYCOyLOEjWsM';
+
+        // Your Firebase configuration object. Get this from your Firebase project settings.
+        const firebaseConfig = {
+            apiKey: "AIzaSyD3o20KOUX7GotPiLm53voBfJya_jwLnEA",
+            authDomain: "salon-e14be.firebaseapp.com",
+            projectId: "salon-e14be",
+            storageBucket: "salon-e14be.firebasestorage.app",
+            messagingSenderId: "567945664700",
+            appId: "1:567945664700:web:b637ab5fa6a4d5d5b998b9",
+            measurementId: "G-NM1V69QPJM"
+        };
 
         let db;
         let auth;
