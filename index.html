@@ -56,8 +56,6 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         
-        // This is a placeholder API key. It will be used by your WordPress proxy, not the frontend.
-        // It is still here for clarity, but you should move it to your server-side code.
         const GOOGLE_PLACES_API_KEY = 'AIzaSyAyh7Ik2dnRJsgwvBtiKX-rYCOyLOEjWsM';
 
         let db;
@@ -150,36 +148,41 @@
             }
 
             try {
-    const query = `hair salon in ${city}`;
-    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${GOOGLE_PLACES_API_KEY}`;
+                const query = `hair salon in ${city}`;
+                const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${GOOGLE_PLACES_API_KEY}`;
+                
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
 
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error('Network response was not ok');
-    }
+                const data = await response.json();
+                const searchResults = data.results || [];
 
-    const data = await response.json();
-    const searchResults = data.results || [];
+                const mySalonsRef = collection(db, `artifacts/${appId}/users/${userId}/my_salons`);
+                
+                // Add new results to the database
+                for (const salon of searchResults) {
+                    const salonData = {
+                        name: salon.name || 'N/A',
+                        address: salon.formatted_address || 'N/A',
+                        phone: salon.formatted_phone_number || 'N/A',
+                        website: salon.website || 'N/A'
+                    };
+                    await addDoc(mySalonsRef, salonData);
+                }
+                return searchResults.length;
 
-    const mySalonsRef = collection(db, `artifacts/${appId}/users/${userId}/my_salons`);
-
-    // Add new results to the database
-    for (const salon of searchResults) {
-        const salonData = {
-            name: salon.name || 'N/A',
-            address: salon.formatted_address || 'N/A',
-            phone: salon.formatted_phone_number || 'N/A',
-            website: salon.website || 'N/A'
+            } catch (error) {
+                console.error("Error during search and save:", error);
+                if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                    updateStatus(`Search failed: This app cannot make live API calls from this temporary environment due to CORS security restrictions.`, false);
+                } else {
+                    updateStatus("An unexpected error occurred during the search.", false);
+                }
+                return -1; // Indicate a failure
+            }
         };
-        await addDoc(mySalonsRef, salonData);
-    }
-    return searchResults.length;
-
-} catch (error) {
-    console.error("Error during search and save:", error);
-    updateStatus("An unexpected error occurred during the search.", false);
-    return -1; // Indicate a failure
-}
 
         const displayResults = (results) => {
             resultsContainer.innerHTML = '';
@@ -277,37 +280,23 @@
 
             updateStatus('Searching...', true);
             
-          try {
-    const query = `hair salon in ${city}`;
-    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${GOOGLE_PLACES_API_KEY}`;
+            try {
+                const salonsAdded = await searchSalons(cityInput);
 
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error('Network response was not ok');
-    }
+                let message = '';
+                if (salonsAdded > 0) {
+                    message = `Search complete! Found ${salonsAdded} salons in ${cityInput}.`;
+                } else {
+                    message = `No salons were found for "${cityInput}". Please check the city name.`;
+                }
+                
+                updateStatus(message, false);
 
-    const data = await response.json();
-    const searchResults = data.results || [];
-
-    const mySalonsRef = collection(db, `artifacts/${appId}/users/${userId}/my_salons`);
-
-    // Add new results to the database
-    for (const salon of searchResults) {
-        const salonData = {
-            name: salon.name || 'N/A',
-            address: salon.formatted_address || 'N/A',
-            phone: salon.formatted_phone_number || 'N/A',
-            website: salon.website || 'N/A'
-        };
-        await addDoc(mySalonsRef, salonData);
-    }
-    return searchResults.length;
-
-} catch (error) {
-    console.error("Error during search and save:", error);
-    updateStatus("An unexpected error occurred during the search.", false);
-    return -1; // Indicate a failure
-}
+            } catch (error) {
+                console.error("Search failed:", error);
+                updateStatus("An unexpected error occurred during the search.", false);
+            }
+        });
 
         exportButton.addEventListener('click', exportSalons);
         clearButton.addEventListener('click', clearSalons);
