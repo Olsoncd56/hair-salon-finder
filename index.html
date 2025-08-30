@@ -49,8 +49,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
         import { getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, getDocs, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
         
         setLogLevel('Debug');
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
