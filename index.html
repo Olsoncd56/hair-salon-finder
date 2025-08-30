@@ -53,21 +53,11 @@
         
         setLogLevel('Debug');
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
         
         // --- API Keys & Configuration ---
         // Your Google Places API key.
         const GOOGLE_PLACES_API_KEY = 'AIzaSyAyh7Ik2dnRJsgwvBtiKX-rYCOyLOEjWsM';
-
-        // Your Firebase configuration object. Get this from your Firebase project settings.
-        const firebaseConfig = {
-            apiKey: "AIzaSyD3o20KOUX7GotPiLm53voBfJya_jwLnEA",
-            authDomain: "salon-e14be.firebaseapp.com",
-            projectId: "salon-e14be",
-            storageBucket: "salon-e14be.firebasestorage.app",
-            messagingSenderId: "567945664700",
-            appId: "1:567945664700:web:b637ab5fa6a4d5d5b998b9",
-            measurementId: "G-NM1V69QPJM"
-        };
 
         let db;
         let auth;
@@ -100,6 +90,11 @@
 
         // Initialize Firebase and handle authentication
         const initializeFirebase = async () => {
+            if (!firebaseConfig) {
+                updateStatus('Firebase configuration is missing.', false);
+                console.error("Firebase initialization failed: firebaseConfig is missing.");
+                return;
+            }
             try {
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
