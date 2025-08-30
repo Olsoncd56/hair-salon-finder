@@ -91,8 +91,8 @@
         // Initialize Firebase and handle authentication
         const initializeFirebase = async () => {
             if (!firebaseConfig) {
-                updateStatus('Firebase configuration is missing.', false);
-                console.error("Firebase initialization failed: firebaseConfig is missing.");
+                updateStatus('Firebase configuration is missing. Please check your app settings.', false);
+                console.error("Firebase initialization failed: The '__firebase_config' environment variable is missing.");
                 return;
             }
             try {
