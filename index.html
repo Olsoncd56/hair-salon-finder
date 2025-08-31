@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hair Salon Finder</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        @import url('[https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap)');
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f3f4f6;
@@ -47,9 +47,9 @@
         }
     </style>
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, getDocs, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+        import { initializeApp } from "[https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js](https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js)";
+        import { getAuth, signInWithCustomToken, signInAnonymously } from "[https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js](https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js)";
+        import { getFirestore, collection, addDoc, onSnapshot, getDocs, deleteDoc, setLogLevel } from "[https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js](https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js)";
         
         setLogLevel('Debug');
         const appId = 'default-app-id';
@@ -66,10 +66,6 @@
             measurementId: "G-NM1V69QPJM"
         };
         
-        // --- API Keys & Configuration ---
-        // Your Google Places API key.
-        const GOOGLE_PLACES_API_KEY = 'AIzaSyAyh7Ik2dnRJsgwvBtiKX-rYCOyLOEjWsM';
-
         let db;
         let auth;
         let userId;
@@ -83,7 +79,6 @@
         const loadingSpinner = document.getElementById('loading-spinner');
         const statusMessage = document.getElementById('status-message');
         const userIdDisplay = document.getElementById('user-id-display');
-
 
         /**
          * A helper function to manage the status message and loading spinner UI.
@@ -149,7 +144,7 @@
         };
         
         /**
-         * Searches for salons using the Google Places API and saves them to Firestore.
+         * Searches for salons using a server-side search tool and saves them to Firestore.
          * @param {string} city The city to search for.
          * @returns {Promise<number>} The number of salons added, or -1 on error.
          */
@@ -159,38 +154,72 @@
             }
 
             try {
-                const query = `hair salon in ${city}`;
-                const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${GOOGLE_PLACES_API_KEY}`;
+                const query = `hair salons in ${city} near me`;
+                const systemPrompt = `You are a helpful assistant that extracts information from search results to create a list of hair salons. For each salon, extract the name, address, phone number (if available), and website (if available). Provide a JSON array of objects with these properties. The JSON array should contain at least 5 salons if possible.`;
+                const userQuery = `Find hair salons for the city: ${city}`;
                 
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                const payload = {
+                    contents: [{ parts: [{ text: userQuery }] }],
+                    tools: [{ "google_search": {} }],
+                    systemInstruction: {
+                        parts: [{ text: systemPrompt }]
+                    },
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "ARRAY",
+                            items: {
+                                type: "OBJECT",
+                                properties: {
+                                    "name": { "type": "STRING" },
+                                    "address": { "type": "STRING" },
+                                    "phone": { "type": "STRING" },
+                                    "website": { "type": "STRING" }
+                                },
+                                "propertyOrdering": ["name", "address", "phone", "website"]
+                            }
+                        }
+                    }
+                };
+                
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                const candidate = result?.candidates?.[0];
+
+                if (!candidate || !candidate.content?.parts?.[0]?.text) {
+                    throw new Error("API response was not in the expected format.");
                 }
 
-                const data = await response.json();
-                const searchResults = data.results || [];
+                const jsonString = candidate.content.parts[0].text;
+                const searchResults = JSON.parse(jsonString);
 
                 const mySalonsRef = collection(db, `artifacts/${appId}/users/${userId}/my_salons`);
                 
-                // Add new results to the database
+                let salonsAdded = 0;
                 for (const salon of searchResults) {
+                    // Ensure the data is in the expected format
                     const salonData = {
                         name: salon.name || 'N/A',
-                        address: salon.formatted_address || 'N/A',
-                        phone: salon.formatted_phone_number || 'N/A',
+                        address: salon.address || 'N/A',
+                        phone: salon.phone || 'N/A',
                         website: salon.website || 'N/A'
                     };
                     await addDoc(mySalonsRef, salonData);
+                    salonsAdded++;
                 }
-                return searchResults.length;
+                return salonsAdded;
 
             } catch (error) {
                 console.error("Error during search and save:", error);
-                if (error instanceof TypeError && error.message === 'Failed to fetch') {
-                    updateStatus(`Search failed: This app cannot make live API calls from this temporary environment due to CORS security restrictions.`, false);
-                } else {
-                    updateStatus("An unexpected error occurred during the search.", false);
-                }
+                updateStatus("An unexpected error occurred during the search. Please check the console for details.", false);
                 return -1; // Indicate a failure
             }
         };
@@ -297,7 +326,7 @@
                 let message = '';
                 if (salonsAdded > 0) {
                     message = `Search complete! Found ${salonsAdded} salons in ${cityInput}.`;
-                } else {
+                } else if (salonsAdded === 0) {
                     message = `No salons were found for "${cityInput}". Please check the city name.`;
                 }
                 
@@ -321,7 +350,7 @@
     <div class="container mx-auto p-8 card">
         <h1 class="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-6">Hair Salon Finder</h1>
         <p class="text-center text-gray-600 mb-8">
-            Enter a U.S. city to find local hair salons and build your marketing list.
+            Enter a city to find live results and build your marketing list.
         </p>
 
         <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
