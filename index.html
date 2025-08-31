@@ -52,7 +52,6 @@
 
         /**
          * A helper function to manage the status message and loading spinner UI.
-         * This function is declared outside of window.onload so it can be used anywhere.
          * @param {HTMLElement} statusElement The element to display the message in.
          * @param {HTMLElement} spinnerElement The loading spinner element.
          * @param {string} message The message to display.
@@ -69,6 +68,12 @@
 
         /**
          * Clears all search results and the input field.
+         * @param {HTMLElement} resultsElement The container for results.
+         * @param {HTMLElement} inputElement The search input field.
+         * @param {HTMLElement} exportButton The export button.
+         * @param {HTMLElement} clearButton The clear button.
+         * @param {HTMLElement} statusElement The status message element.
+         * @param {HTMLElement} spinnerElement The loading spinner element.
          */
         const clearResults = (resultsElement, inputElement, exportButton, clearButton, statusElement, spinnerElement) => {
             resultsElement.innerHTML = '';
@@ -82,6 +87,11 @@
         /**
          * Searches for salons using the Google Places API.
          * @param {string} city The city to search for.
+         * @param {HTMLElement} resultsElement The container for results.
+         * @param {HTMLElement} exportButton The export button.
+         * @param {HTMLElement} clearButton The clear button.
+         * @param {HTMLElement} statusElement The status message element.
+         * @param {HTMLElement} spinnerElement The loading spinner element.
          */
         const searchSalons = async (city, resultsElement, exportButton, clearButton, statusElement, spinnerElement) => {
             const query = encodeURIComponent(`hair salons in ${city}`);
@@ -90,7 +100,6 @@
             try {
                 const response = await fetch(apiUrl);
                 if (!response.ok) {
-                    // Handle non-200 responses
                     throw new Error(`API call failed with status ${response.status}.`);
                 }
 
@@ -151,6 +160,8 @@
 
         /**
          * Exports the current salon data to a CSV file.
+         * @param {HTMLElement} statusElement The status message element.
+         * @param {HTMLElement} spinnerElement The loading spinner element.
          */
         const exportToCsv = (statusElement, spinnerElement) => {
             if (salonData.length === 0) {
