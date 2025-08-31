@@ -51,11 +51,12 @@
         const searchInput = document.getElementById('search-input');
         const searchButton = document.getElementById('search-button');
         const exportButton = document.getElementById('export-button');
+        const clearButton = document.getElementById('clear-button');
         const loadingSpinner = document.getElementById('loading-spinner');
         const statusMessage = document.getElementById('status-message');
         
-        // This is a placeholder for the API key, which is handled automatically by the platform.
-        const apiKey = ""; 
+        // This is the Google Places API key you provided.
+        const GOOGLE_PLACES_API_KEY = "AIzaSyAyh7Ik2dnRJsgwvBtiKX-rYCOyLOEjWsM"; 
         let salonData = []; // To store results for export
 
         /**
@@ -73,56 +74,58 @@
         };
 
         /**
-         * Searches for salons using a server-side search tool and displays them.
-         * This version uses a structured JSON response to ensure data integrity.
+         * Clears all search results and the input field.
+         */
+        const clearResults = () => {
+            resultsContainer.innerHTML = '';
+            searchInput.value = '';
+            salonData = [];
+            exportButton.classList.add('hidden');
+            clearButton.classList.add('hidden');
+            updateStatus('Enter a city and click Search.', false);
+        };
+
+        /**
+         * Searches for salons using the Google Places Text Search API.
          * @param {string} city The city to search for.
          */
         const searchSalons = async (city) => {
             try {
-                const userQuery = `Find up to 20 hair salons in ${city}. For each salon, list the Name, Address, Phone, and Website URL, separating each with a comma.`;
-                const systemPrompt = `Provide the list of salons as a plain text string. Each salon's details should be on a new line, and each detail (name, address, phone, website) should be separated by a comma. Do not include any extra text.`;
+                // Construct the Google Places Text Search URL
+                const query = `hair salons in ${city}`;
+                const apiUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${GOOGLE_PLACES_API_KEY}`;
                 
-                const payload = {
-                    contents: [{ parts: [{ text: userQuery }] }],
-                    tools: [{ "google_search": {} }],
-                    systemInstruction: {
-                        parts: [{ text: systemPrompt }]
-                    },
-                    generationConfig: {
-                        responseMimeType: "text/plain",
-                    }
-                };
-                
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                // Fetch the data from the Google Places API
+                const response = await fetch(apiUrl);
                 
                 if (!response.ok) {
-                    console.error("API call failed with status:", response.status, response.statusText);
                     throw new Error(`API call failed with status ${response.status}`);
                 }
 
-                const result = await response.json();
-                const candidate = result?.candidates?.[0];
-
-                if (!candidate || !candidate.content?.parts?.[0]?.text) {
-                    throw new Error("API response was not in the expected format.");
+                const data = await response.json();
+                
+                // Check for API-level errors
+                if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+                    throw new Error(`Google Places API error: ${data.status}`);
                 }
 
-                const textResults = candidate.content.parts[0].text;
+                // Map the results to our data structure
+                salonData = data.results.map(place => ({
+                    name: place.name || 'N/A',
+                    address: place.formatted_address || 'N/A',
+                    phone: place.formatted_phone_number || 'N/A',
+                    website: place.website || 'N/A' 
+                }));
                 
-                salonData = parseResults(textResults);
                 displayResults(salonData);
                 
                 if (salonData.length > 0) {
                     exportButton.classList.remove('hidden');
+                    clearButton.classList.remove('hidden');
                     updateStatus(`Search complete! Found ${salonData.length} salons in ${city}.`, false);
                 } else {
                     exportButton.classList.add('hidden');
+                    clearButton.classList.add('hidden');
                     updateStatus(`Search complete! Found no salons in ${city}.`, false);
                 }
 
@@ -132,24 +135,6 @@
             }
         };
         
-        /**
-         * Parses the plain text results into a structured array of objects.
-         * @param {string} text The text to parse.
-         * @returns {Array<Object>} An array of salon objects.
-         */
-        const parseResults = (text) => {
-            const lines = text.split('\n').filter(line => line.trim() !== '');
-            return lines.map(line => {
-                const parts = line.split(',').map(part => part.trim());
-                return {
-                    name: parts[0] || 'N/A',
-                    address: parts[1] || 'N/A',
-                    phone: parts[2] || 'N/A',
-                    website: parts[3] || 'N/A',
-                };
-            });
-        };
-
         /**
          * Displays the search results in the UI.
          * @param {Array<Object>} results The array of salon objects to display.
@@ -222,26 +207,10 @@
         });
         
         exportButton.addEventListener('click', exportToCsv);
-
-        // Pre-populated results for "Laguna Niguel, CA"
-        salonData = [
-          { name: 'Kenneth Brown Salons', address: '28121 Crown Valley Pkwy. Laguna Niguel, CA 92688', phone: '949.600.5702', website: 'https://www.kennethbrownsalons.com/laguna-niguel/' },
-          { name: 'Fantastic Sams', address: '30035 Alicia Parkway, Laguna Niguel, CA 92677', phone: '(949) 495-7267', website: 'https://www.fantasticsams.com/salons/fantastic-sams-laguna-niguel-ca' },
-          { name: 'Salon 356', address: 'N/A', phone: '(949) 348-0356', website: 'https://www.salon356.com/' },
-          { name: 'Dedication Salon', address: '29955 Alicia Parkway, Laguna Niguel, CA 92677', phone: '(949) 495-9522', website: 'http://www.dedicationsalon.com/' },
-          { name: 'Salon Shear Paradise', address: '28940 Golden Lantern #B - Laguna Niguel - CA - 92677', phone: '949-363-9166', website: 'http://www.salonshearparadise.com/wp_sh/' },
-          { name: 'Great Clips Hair Salon', address: '27901 La Paz Rd. Ste B. Laguna Niguel, California 92677', phone: 'N/A', website: 'https://salons.greatclips.com/us/ca/laguna-niguel/27901-la-paz-rd' },
-          { name: 'Onyx Hair Studio', address: 'N/A', phone: 'N/A', website: 'https://www.onyxhairoc.com/' },
-          { name: 'Refine Men\'s Salon of Laguna Niguel', address: '27241 La Paz Rd Suite A. Laguna Niguel CA 92677', phone: '(949) 643-1818', website: 'https://refinemenssalon.com/laguna-niguel/' },
-          { name: 'Howard Jones Salon & Spa', address: 'Clubhouse Plaza 31271 Niguel Road, Suite G, Laguna Niguel, CA, 92677', phone: '(949) 248-9343', website: 'https://www.howardjonessalonandspa.com/' },
-          { name: 'Dgurlstylezz', address: 'N/A', phone: 'N/A', website: 'N/A' },
-          { name: 'Wifey Beauty', address: 'N/A', phone: 'N/A', website: 'N/A' }
-        ];
+        clearButton.addEventListener('click', clearResults);
 
         window.onload = () => {
-          displayResults(salonData);
-          exportButton.classList.remove('hidden');
-          updateStatus(`Search complete! Found ${salonData.length} salons in Laguna Niguel, CA.`, false);
+          updateStatus('Enter a city and click Search.', false);
         };
 
     </script>
@@ -261,6 +230,9 @@
             </button>
             <button id="export-button" class="hidden button px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700">
                 Export to CSV
+            </button>
+            <button id="clear-button" class="hidden button px-6 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">
+                Clear
             </button>
         </div>
 
