@@ -47,6 +47,8 @@
         }
     </style>
     <script>
+        // The DOM elements are initialized here, but their event listeners are added in window.onload
+        // to ensure they exist before the script tries to attach them.
         const resultsContainer = document.getElementById('results-container');
         const searchInput = document.getElementById('search-input');
         const searchButton = document.getElementById('search-button');
@@ -188,21 +190,22 @@
             updateStatus('CSV file exported successfully!', false);
         };
 
-        searchButton.addEventListener('click', () => {
-            const cityInput = searchInput.value.trim();
-            if (!cityInput) {
-                updateStatus('Please enter a city name.', false);
-                return;
-            }
-
-            updateStatus('Searching...', true);
-            searchSalons(cityInput);
-        });
-
-        exportButton.addEventListener('click', exportToCsv);
-        clearButton.addEventListener('click', clearResults);
-
+        // All event listeners are now inside window.onload to ensure the DOM is ready.
         window.onload = () => {
+            searchButton.addEventListener('click', () => {
+                const cityInput = searchInput.value.trim();
+                if (!cityInput) {
+                    updateStatus('Please enter a city name.', false);
+                    return;
+                }
+
+                updateStatus('Searching...', true);
+                searchSalons(cityInput);
+            });
+
+            exportButton.addEventListener('click', exportToCsv);
+            clearButton.addEventListener('click', clearResults);
+
             updateStatus('Enter a city and click Search.', false);
         };
 
