@@ -47,49 +47,42 @@
         }
     </style>
     <script>
-        // The DOM elements are initialized here, but their event listeners are added in window.onload
-        // to ensure they exist before the script tries to attach them.
-        const resultsContainer = document.getElementById('results-container');
-        const searchInput = document.getElementById('search-input');
-        const searchButton = document.getElementById('search-button');
-        const exportButton = document.getElementById('export-button');
-        const clearButton = document.getElementById('clear-button');
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const statusMessage = document.getElementById('status-message');
-        
         let salonData = []; // To store results for export
 
         /**
          * A helper function to manage the status message and loading spinner UI.
+         * This function is declared outside of window.onload so it can be used anywhere.
+         * @param {HTMLElement} statusElement The element to display the message in.
+         * @param {HTMLElement} spinnerElement The loading spinner element.
          * @param {string} message The message to display.
          * @param {boolean} isLoading Whether to show the loading spinner.
          */
-        const updateStatus = (message, isLoading) => {
-            statusMessage.textContent = message;
+        const updateStatus = (statusElement, spinnerElement, message, isLoading) => {
+            statusElement.textContent = message;
             if (isLoading) {
-                loadingSpinner.classList.remove('hidden');
+                spinnerElement.classList.remove('hidden');
             } else {
-                loadingSpinner.classList.add('hidden');
+                spinnerElement.classList.add('hidden');
             }
         };
 
         /**
          * Clears all search results and the input field.
          */
-        const clearResults = () => {
-            resultsContainer.innerHTML = '';
-            searchInput.value = '';
+        const clearResults = (resultsElement, inputElement, exportButton, clearButton, statusElement, spinnerElement) => {
+            resultsElement.innerHTML = '';
+            inputElement.value = '';
             salonData = [];
             exportButton.classList.add('hidden');
             clearButton.classList.add('hidden');
-            updateStatus('Enter a city and click Search.', false);
+            updateStatus(statusElement, spinnerElement, 'Enter a city and click Search.', false);
         };
 
         /**
          * Searches for salons using a server-side search tool to bypass CORS issues.
          * @param {string} city The city to search for.
          */
-        const searchSalons = async (city) => {
+        const searchSalons = async (city, resultsElement, exportButton, clearButton, statusElement, spinnerElement) => {
             try {
                 // Use a server-side search tool to avoid CORS issues
                 const payload = {
@@ -109,16 +102,16 @@
                         website: place.website || 'N/A'
                     }));
 
-                    displayResults(salonData);
+                    displayResults(resultsElement, salonData);
 
                     if (salonData.length > 0) {
                         exportButton.classList.remove('hidden');
                         clearButton.classList.remove('hidden');
-                        updateStatus(`Search complete! Found ${salonData.length} salons in ${city}.`, false);
+                        updateStatus(statusElement, spinnerElement, `Search complete! Found ${salonData.length} salons in ${city}.`, false);
                     } else {
                         exportButton.classList.add('hidden');
                         clearButton.classList.add('hidden');
-                        updateStatus(`Search complete! Found no salons in ${city}.`, false);
+                        updateStatus(statusElement, spinnerElement, `Search complete! Found no salons in ${city}.`, false);
                     }
                 } else {
                     throw new Error("No search results found.");
@@ -126,18 +119,19 @@
 
             } catch (error) {
                 console.error("Error during search:", error);
-                updateStatus(`An unexpected error occurred during the search: ${error.message}.`, false);
+                updateStatus(statusElement, spinnerElement, `An unexpected error occurred during the search: ${error.message}.`, false);
             }
         };
 
         /**
          * Displays the search results in the UI.
+         * @param {HTMLElement} resultsElement The container to display results in.
          * @param {Array<Object>} results The array of salon objects to display.
          */
-        const displayResults = (results) => {
-            resultsContainer.innerHTML = '';
+        const displayResults = (resultsElement, results) => {
+            resultsElement.innerHTML = '';
             if (!Array.isArray(results) || results.length === 0) {
-                resultsContainer.innerHTML = '<p class="text-gray-500 text-center">No salons were found. Please check the city name and try again.</p>';
+                resultsElement.innerHTML = '<p class="text-gray-500 text-center">No salons were found. Please check the city name and try again.</p>';
                 return;
             }
             results.forEach((salon) => {
@@ -151,16 +145,16 @@
                         <a href="${salon.website && salon.website !== 'N/A' ? salon.website : '#'}" target="_blank" class="text-blue-600 hover:underline mt-1 block">${salon.website || 'N/A'}</a>
                     </div>
                 `;
-                resultsContainer.appendChild(salonCard);
+                resultsElement.appendChild(salonCard);
             });
         };
 
         /**
          * Exports the current salon data to a CSV file.
          */
-        const exportToCsv = () => {
+        const exportToCsv = (statusElement, spinnerElement) => {
             if (salonData.length === 0) {
-                updateStatus('No data to export.', false);
+                updateStatus(statusElement, spinnerElement, 'No data to export.', false);
                 return;
             }
 
@@ -187,26 +181,40 @@
             link.click();
             document.body.removeChild(link);
 
-            updateStatus('CSV file exported successfully!', false);
+            updateStatus(statusElement, spinnerElement, 'CSV file exported successfully!', false);
         };
 
-        // All event listeners are now inside window.onload to ensure the DOM is ready.
+        // All DOM element references and event listeners are now correctly placed inside window.onload
+        // to ensure the elements are available before the script tries to access them.
         window.onload = () => {
+            const resultsContainer = document.getElementById('results-container');
+            const searchInput = document.getElementById('search-input');
+            const searchButton = document.getElementById('search-button');
+            const exportButton = document.getElementById('export-button');
+            const clearButton = document.getElementById('clear-button');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const statusMessage = document.getElementById('status-message');
+
             searchButton.addEventListener('click', () => {
                 const cityInput = searchInput.value.trim();
                 if (!cityInput) {
-                    updateStatus('Please enter a city name.', false);
+                    updateStatus(statusMessage, loadingSpinner, 'Please enter a city name.', false);
                     return;
                 }
 
-                updateStatus('Searching...', true);
-                searchSalons(cityInput);
+                updateStatus(statusMessage, loadingSpinner, 'Searching...', true);
+                searchSalons(cityInput, resultsContainer, exportButton, clearButton, statusMessage, loadingSpinner);
             });
 
-            exportButton.addEventListener('click', exportToCsv);
-            clearButton.addEventListener('click', clearResults);
+            exportButton.addEventListener('click', () => {
+                exportToCsv(statusMessage, loadingSpinner);
+            });
+            
+            clearButton.addEventListener('click', () => {
+                clearResults(resultsContainer, searchInput, exportButton, clearButton, statusMessage, loadingSpinner);
+            });
 
-            updateStatus('Enter a city and click Search.', false);
+            updateStatus(statusMessage, loadingSpinner, 'Enter a city and click Search.', false);
         };
 
     </script>
