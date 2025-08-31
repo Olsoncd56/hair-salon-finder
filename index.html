@@ -53,7 +53,17 @@
         
         setLogLevel('Debug');
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        
+        // --- Firebase Configuration ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyD3o20KOUX7GotPiLm53voBfJya_jwLnEA",
+          authDomain: "salon-e14be.firebaseapp.com",
+          projectId: "salon-e14be",
+          storageBucket: "salon-e14be.firebasestorage.app",
+          messagingSenderId: "567945664700",
+          appId: "1:567945664700:web:b637ab5fa6a4d5d5b998b9",
+          measurementId: "G-NM1V69QPJM"
+        };
         
         // --- API Keys & Configuration ---
         // Your Google Places API key.
@@ -90,9 +100,9 @@
 
         // Initialize Firebase and handle authentication
         const initializeFirebase = async () => {
-            if (!firebaseConfig) {
-                updateStatus('Firebase configuration is missing. Please check your app settings.', false);
-                console.error("Firebase initialization failed: The '__firebase_config' environment variable is missing.");
+            if (!firebaseConfig || !firebaseConfig.apiKey) {
+                updateStatus('Firebase configuration is missing. Please update the firebaseConfig object in the code.', false);
+                console.error("Firebase initialization failed: The 'firebaseConfig' object is not set.");
                 return;
             }
             try {
@@ -100,13 +110,7 @@
                 auth = getAuth(app);
                 db = getFirestore(app);
 
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : '';
-                
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                await signInAnonymously(auth);
 
                 userId = auth.currentUser?.uid;
                 userIdDisplay.textContent = `User ID: ${userId || 'N/A'}`;
