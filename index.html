@@ -48,10 +48,10 @@
     </style>
     <script>
         let salonData = []; // To store results for export
-        const API_KEY = 'AIzaSyAyh7Ik2dnRJsgwvBtiKX-rYCOyLOEjWsM';
 
         /**
          * A helper function to manage the status message and loading spinner UI.
+         * This function is declared outside of window.onload so it can be used anywhere.
          * @param {HTMLElement} statusElement The element to display the message in.
          * @param {HTMLElement} spinnerElement The loading spinner element.
          * @param {string} message The message to display.
@@ -68,12 +68,6 @@
 
         /**
          * Clears all search results and the input field.
-         * @param {HTMLElement} resultsElement The container for results.
-         * @param {HTMLElement} inputElement The search input field.
-         * @param {HTMLElement} exportButton The export button.
-         * @param {HTMLElement} clearButton The clear button.
-         * @param {HTMLElement} statusElement The status message element.
-         * @param {HTMLElement} spinnerElement The loading spinner element.
          */
         const clearResults = (resultsElement, inputElement, exportButton, clearButton, statusElement, spinnerElement) => {
             resultsElement.innerHTML = '';
@@ -85,30 +79,26 @@
         };
 
         /**
-         * Searches for salons using the Google Places API.
+         * Searches for salons using a server-side search tool to bypass CORS issues.
          * @param {string} city The city to search for.
-         * @param {HTMLElement} resultsElement The container for results.
-         * @param {HTMLElement} exportButton The export button.
-         * @param {HTMLElement} clearButton The clear button.
-         * @param {HTMLElement} statusElement The status message element.
-         * @param {HTMLElement} spinnerElement The loading spinner element.
          */
         const searchSalons = async (city, resultsElement, exportButton, clearButton, statusElement, spinnerElement) => {
-            const query = encodeURIComponent(`hair salons in ${city}`);
-            const apiUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${query}&key=${API_KEY}`;
-            
             try {
-                const response = await fetch(apiUrl);
-                if (!response.ok) {
-                    throw new Error(`API call failed with status ${response.status}.`);
-                }
+                // Use a server-side search tool to avoid CORS issues
+                const payload = {
+                    queries: [`hair salons in ${city}`]
+                };
 
-                const data = await response.json();
-                if (data.status === 'OK') {
-                    salonData = data.results.map(place => ({
+                const response = await google_search.search(payload);
+
+                if (response && response.results && response.results.length > 0) {
+                    const searchResult = response.results[0];
+                    const places = JSON.parse(searchResult.organic_results);
+
+                    salonData = places.map(place => ({
                         name: place.name || 'N/A',
-                        address: place.formatted_address || 'N/A',
-                        phone: place.formatted_phone_number || 'N/A',
+                        address: place.address || 'N/A',
+                        phone: place.phone || 'N/A',
                         website: place.website || 'N/A'
                     }));
 
@@ -124,8 +114,9 @@
                         updateStatus(statusElement, spinnerElement, `Search complete! Found no salons in ${city}.`, false);
                     }
                 } else {
-                    throw new Error(`API returned status: ${data.status}`);
+                    throw new Error("No search results found.");
                 }
+
             } catch (error) {
                 console.error("Error during search:", error);
                 updateStatus(statusElement, spinnerElement, `An unexpected error occurred during the search: ${error.message}.`, false);
@@ -160,8 +151,6 @@
 
         /**
          * Exports the current salon data to a CSV file.
-         * @param {HTMLElement} statusElement The status message element.
-         * @param {HTMLElement} spinnerElement The loading spinner element.
          */
         const exportToCsv = (statusElement, spinnerElement) => {
             if (salonData.length === 0) {
