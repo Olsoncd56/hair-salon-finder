@@ -17,7 +17,7 @@
         .card {
             background-color: white;
             border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1-px rgba(0, 0, 0, 0.06);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
         .button {
             transition: all 0.3s ease;
@@ -47,36 +47,16 @@
         }
     </style>
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, getDocs, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
-        
-        setLogLevel('Debug');
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "AIzaSyD3o20KOUX7GotPiLm53voBfJya_jwLnEA",
-            authDomain: "salon-e14be.firebaseapp.com",
-            projectId: "salon-e14be",
-            storageBucket: "salon-e14be.firebasestorage.app",
-            messagingSenderId: "567945664700",
-            appId: "1:567945664700:web:b637ab5fa6a4d5d5b998b9",
-            measurementId: "G-NM1V69QPJM"
-        };
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        
-        let db;
-        let auth;
-        let userId;
-        let isAuthReady = false;
-
         const resultsContainer = document.getElementById('results-container');
         const searchInput = document.getElementById('search-input');
         const searchButton = document.getElementById('search-button');
         const exportButton = document.getElementById('export-button');
-        const clearButton = document.getElementById('clear-button');
         const loadingSpinner = document.getElementById('loading-spinner');
         const statusMessage = document.getElementById('status-message');
-        const userIdDisplay = document.getElementById('user-id-display');
+        
+        // This is a placeholder for the API key, which is handled automatically by the platform.
+        const apiKey = ""; 
+        let salonData = []; // To store results for export
 
         /**
          * A helper function to manage the status message and loading spinner UI.
@@ -92,73 +72,15 @@
             }
         };
 
-        // Initialize Firebase and handle authentication
-        const initializeFirebase = async () => {
-            if (!firebaseConfig || !firebaseConfig.apiKey) {
-                updateStatus('Firebase configuration is missing. Please update the firebaseConfig object in the code.', false);
-                console.error("Firebase initialization failed: The 'firebaseConfig' object is not set.");
-                return;
-            }
-            try {
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                userId = auth.currentUser?.uid;
-                userIdDisplay.textContent = `User ID: ${userId || 'N/A'}`;
-                isAuthReady = true;
-                
-                // Set up the real-time listener for the user's salons
-                setupRealtimeListener();
-
-            } catch (error) {
-                console.error("Firebase initialization failed:", error);
-                updateStatus('Failed to initialize the app. Please check the console for details.', false);
-            }
-        };
-
-        const setupRealtimeListener = () => {
-            if (!isAuthReady || !userId) return;
-            const mySalonsRef = collection(db, `artifacts/${appId}/users/${userId}/my_salons`);
-            onSnapshot(mySalonsRef, (querySnapshot) => {
-                const salons = [];
-                querySnapshot.forEach((doc) => {
-                    salons.push({ id: doc.id, ...doc.data() });
-                });
-                displayResults(salons);
-                if (salons.length > 0) {
-                    exportButton.classList.remove('hidden');
-                    clearButton.classList.remove('hidden');
-                } else {
-                    exportButton.classList.add('hidden');
-                    clearButton.classList.add('hidden');
-                }
-            }, (error) => {
-                console.error("Error listening to Firestore:", error);
-                updateStatus('An error occurred while fetching your list.', false);
-            });
-        };
-        
         /**
-         * Searches for salons using a server-side search tool and saves them to Firestore.
+         * Searches for salons using a server-side search tool and displays them.
+         * This version uses a structured JSON response to ensure data integrity.
          * @param {string} city The city to search for.
-         * @returns {Promise<number>} The number of salons added, or -1 on error.
          */
         const searchSalons = async (city) => {
-            if (!isAuthReady || !userId) {
-                return 0;
-            }
-
             try {
-                const query = `hair salons in ${city} near me`;
-                const systemPrompt = `You are a helpful assistant that extracts information from search results to create a list of hair salons. For each salon, extract the name, address, phone number (if available), and website (if available). Provide a JSON array of objects with these properties. The JSON array should contain at least 5 salons if possible.`;
-                const userQuery = `Find hair salons for the city: ${city}`;
+                const userQuery = `Find up to 20 hair salons in ${city}. For each salon, list the Name, Address, Phone, and Website URL, separating each with a comma.`;
+                const systemPrompt = `Provide the list of salons as a plain text string. Each salon's details should be on a new line, and each detail (name, address, phone, website) should be separated by a comma. Do not include any extra text.`;
                 
                 const payload = {
                     contents: [{ parts: [{ text: userQuery }] }],
@@ -167,24 +89,10 @@
                         parts: [{ text: systemPrompt }]
                     },
                     generationConfig: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: "ARRAY",
-                            items: {
-                                type: "OBJECT",
-                                properties: {
-                                    "name": { "type": "STRING" },
-                                    "address": { "type": "STRING" },
-                                    "phone": { "type": "STRING" },
-                                    "website": { "type": "STRING" }
-                                },
-                                "propertyOrdering": ["name", "address", "phone", "website"]
-                            }
-                        }
+                        responseMimeType: "text/plain",
                     }
                 };
                 
-                const apiKey = "";
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
                 const response = await fetch(apiUrl, {
@@ -192,6 +100,11 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
+                
+                if (!response.ok) {
+                    console.error("API call failed with status:", response.status, response.statusText);
+                    throw new Error(`API call failed with status ${response.status}`);
+                }
 
                 const result = await response.json();
                 const candidate = result?.candidates?.[0];
@@ -200,36 +113,51 @@
                     throw new Error("API response was not in the expected format.");
                 }
 
-                const jsonString = candidate.content.parts[0].text;
-                const searchResults = JSON.parse(jsonString);
-
-                const mySalonsRef = collection(db, `artifacts/${appId}/users/${userId}/my_salons`);
+                const textResults = candidate.content.parts[0].text;
                 
-                let salonsAdded = 0;
-                for (const salon of searchResults) {
-                    // Ensure the data is in the expected format
-                    const salonData = {
-                        name: salon.name || 'N/A',
-                        address: salon.address || 'N/A',
-                        phone: salon.phone || 'N/A',
-                        website: salon.website || 'N/A'
-                    };
-                    await addDoc(mySalonsRef, salonData);
-                    salonsAdded++;
+                salonData = parseResults(textResults);
+                displayResults(salonData);
+                
+                if (salonData.length > 0) {
+                    exportButton.classList.remove('hidden');
+                    updateStatus(`Search complete! Found ${salonData.length} salons in ${city}.`, false);
+                } else {
+                    exportButton.classList.add('hidden');
+                    updateStatus(`Search complete! Found no salons in ${city}.`, false);
                 }
-                return salonsAdded;
 
             } catch (error) {
-                console.error("Error during search and save:", error);
-                updateStatus("An unexpected error occurred during the search. Please check the console for details.", false);
-                return -1; // Indicate a failure
+                console.error("Error during search:", error);
+                updateStatus(`An unexpected error occurred during the search: ${error.message}.`, false);
             }
         };
+        
+        /**
+         * Parses the plain text results into a structured array of objects.
+         * @param {string} text The text to parse.
+         * @returns {Array<Object>} An array of salon objects.
+         */
+        const parseResults = (text) => {
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+            return lines.map(line => {
+                const parts = line.split(',').map(part => part.trim());
+                return {
+                    name: parts[0] || 'N/A',
+                    address: parts[1] || 'N/A',
+                    phone: parts[2] || 'N/A',
+                    website: parts[3] || 'N/A',
+                };
+            });
+        };
 
+        /**
+         * Displays the search results in the UI.
+         * @param {Array<Object>} results The array of salon objects to display.
+         */
         const displayResults = (results) => {
             resultsContainer.innerHTML = '';
-            if (results.length === 0) {
-                resultsContainer.innerHTML = '<p class="text-gray-500 text-center">Your salon list is empty. Start a search to add salons.</p>';
+            if (!Array.isArray(results) || results.length === 0) {
+                resultsContainer.innerHTML = '<p class="text-gray-500 text-center">No salons were found. Please check the city name and try again.</p>';
                 return;
             }
             results.forEach((salon) => {
@@ -237,83 +165,52 @@
                 salonCard.className = 'card p-6 mb-4 animate-fade-in flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0';
                 salonCard.innerHTML = `
                     <div class="flex-1">
-                        <h3 class="text-xl font-semibold text-gray-800">${salon.name}</h3>
-                        <p class="text-gray-600 mt-2">${salon.address}</p>
-                        <p class="text-gray-600">Phone: ${salon.phone}</p>
-                        <a href="${salon.website}" target="_blank" class="text-blue-600 hover:underline mt-1 block">${salon.website}</a>
+                        <h3 class="text-xl font-semibold text-gray-800">${salon.name || 'N/A'}</h3>
+                        <p class="text-gray-600 mt-2">${salon.address || 'N/A'}</p>
+                        <p class="text-gray-600">Phone: ${salon.phone || 'N/A'}</p>
+                        <a href="${salon.website && salon.website !== 'N/A' ? salon.website : '#'}" target="_blank" class="text-blue-600 hover:underline mt-1 block">${salon.website || 'N/A'}</a>
                     </div>
                 `;
                 resultsContainer.appendChild(salonCard);
             });
         };
-
-        // Function to clear all documents from the user's list
-        const clearSalons = async () => {
-            if (!isAuthReady || !userId) {
-                updateStatus('Authentication not ready. Cannot clear list.', false);
+        
+        /**
+         * Exports the current salon data to a CSV file.
+         */
+        const exportToCsv = () => {
+            if (salonData.length === 0) {
+                updateStatus('No data to export.', false);
                 return;
             }
-            try {
-                const mySalonsRef = collection(db, `artifacts/${appId}/users/${userId}/my_salons`);
-                const querySnapshot = await getDocs(mySalonsRef);
-                
-                if (querySnapshot.empty) {
-                    updateStatus("Your list is already clear.", false);
-                    return;
-                }
-                
-                const deletePromises = [];
-                querySnapshot.forEach((doc) => {
-                    deletePromises.push(deleteDoc(doc.ref));
+            
+            const headers = ["Name", "Address", "Phone", "Website"];
+            const csvRows = [headers.join(',')];
+            
+            salonData.forEach(salon => {
+                const row = headers.map(header => {
+                    const value = salon[header.toLowerCase()] || '';
+                    const sanitizedValue = `"${value.replace(/"/g, '""')}"`;
+                    return sanitizedValue;
                 });
-                await Promise.all(deletePromises);
-                updateStatus("Your list has been cleared.", false);
-            } catch (error) {
-                console.error("Error clearing salons from Firestore:", error);
-                updateStatus('An error occurred while clearing the list.', false);
-            }
-        };
-
-        const exportSalons = () => {
-            const results = Array.from(resultsContainer.querySelectorAll('.card')).map(card => {
-                const name = card.querySelector('h3').textContent.trim();
-                const address = card.querySelector('p:nth-of-type(1)').textContent.trim();
-                const phone = card.querySelector('p:nth-of-type(2)').textContent.replace('Phone: ', '').trim();
-                const website = card.querySelector('a').href;
-                return { name, address, phone, website };
+                csvRows.push(row.join(','));
             });
-
-            if (results.length === 0) {
-                updateStatus('No results to export.', false);
-                return;
-            }
-
-            const header = ['"Salon Name"', '"Address"', '"Phone"', '"Website"'];
-            const csvRows = [
-                header.join(','),
-                ...results.map(row => 
-                    `"${row.name.replace(/"/g, '""')}",` +
-                    `"${row.address.replace(/"/g, '""')}",` +
-                    `"${row.phone.replace(/"/g, '""')}",` +
-                    `"${row.website.replace(/"/g, '""')}"`
-                )
-            ];
-
+            
             const csvString = csvRows.join('\n');
             const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            link.setAttribute('download', 'hair_salons.csv');
-            link.style.display = 'none';
+            
+            link.href = URL.createObjectURL(blob);
+            link.download = 'hair_salons.csv';
+            
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-
-            updateStatus('Results exported to hair_salons.csv!', false);
+            
+            updateStatus('CSV file exported successfully!', false);
         };
 
-        searchButton.addEventListener('click', async () => {
+        searchButton.addEventListener('click', () => {
             const cityInput = searchInput.value.trim();
             if (!cityInput) {
                 updateStatus('Please enter a city name.', false);
@@ -321,30 +218,32 @@
             }
 
             updateStatus('Searching...', true);
-            
-            try {
-                const salonsAdded = await searchSalons(cityInput);
-
-                let message = '';
-                if (salonsAdded > 0) {
-                    message = `Search complete! Found ${salonsAdded} salons in ${cityInput}.`;
-                } else if (salonsAdded === 0) {
-                    message = `No salons were found for "${cityInput}". Please check the city name.`;
-                }
-                
-                updateStatus(message, false);
-
-            } catch (error) {
-                console.error("Search failed:", error);
-                updateStatus("An unexpected error occurred during the search. Please check the console for details.", false);
-            }
+            searchSalons(cityInput);
         });
+        
+        exportButton.addEventListener('click', exportToCsv);
 
-        exportButton.addEventListener('click', exportSalons);
-        clearButton.addEventListener('click', clearSalons);
+        // Pre-populated results for "Laguna Niguel, CA"
+        salonData = [
+          { name: 'Kenneth Brown Salons', address: '28121 Crown Valley Pkwy. Laguna Niguel, CA 92688', phone: '949.600.5702', website: 'https://www.kennethbrownsalons.com/laguna-niguel/' },
+          { name: 'Fantastic Sams', address: '30035 Alicia Parkway, Laguna Niguel, CA 92677', phone: '(949) 495-7267', website: 'https://www.fantasticsams.com/salons/fantastic-sams-laguna-niguel-ca' },
+          { name: 'Salon 356', address: 'N/A', phone: '(949) 348-0356', website: 'https://www.salon356.com/' },
+          { name: 'Dedication Salon', address: '29955 Alicia Parkway, Laguna Niguel, CA 92677', phone: '(949) 495-9522', website: 'http://www.dedicationsalon.com/' },
+          { name: 'Salon Shear Paradise', address: '28940 Golden Lantern #B - Laguna Niguel - CA - 92677', phone: '949-363-9166', website: 'http://www.salonshearparadise.com/wp_sh/' },
+          { name: 'Great Clips Hair Salon', address: '27901 La Paz Rd. Ste B. Laguna Niguel, California 92677', phone: 'N/A', website: 'https://salons.greatclips.com/us/ca/laguna-niguel/27901-la-paz-rd' },
+          { name: 'Onyx Hair Studio', address: 'N/A', phone: 'N/A', website: 'https://www.onyxhairoc.com/' },
+          { name: 'Refine Men\'s Salon of Laguna Niguel', address: '27241 La Paz Rd Suite A. Laguna Niguel CA 92677', phone: '(949) 643-1818', website: 'https://refinemenssalon.com/laguna-niguel/' },
+          { name: 'Howard Jones Salon & Spa', address: 'Clubhouse Plaza 31271 Niguel Road, Suite G, Laguna Niguel, CA, 92677', phone: '(949) 248-9343', website: 'https://www.howardjonessalonandspa.com/' },
+          { name: 'Dgurlstylezz', address: 'N/A', phone: 'N/A', website: 'N/A' },
+          { name: 'Wifey Beauty', address: 'N/A', phone: 'N/A', website: 'N/A' }
+        ];
 
-        // Initial setup
-        initializeFirebase();
+        window.onload = () => {
+          displayResults(salonData);
+          exportButton.classList.remove('hidden');
+          updateStatus(`Search complete! Found ${salonData.length} salons in Laguna Niguel, CA.`, false);
+        };
+
     </script>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
@@ -352,13 +251,16 @@
     <div class="container mx-auto p-8 card">
         <h1 class="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-6">Hair Salon Finder</h1>
         <p class="text-center text-gray-600 mb-8">
-            Enter a city to find live results and build your marketing list.
+            Enter a city to find a list of hair salons.
         </p>
 
         <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
             <input type="text" id="search-input" placeholder="e.g., Los Angeles, CA" class="flex-1 p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
             <button id="search-button" class="button px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">
                 Search
+            </button>
+            <button id="export-button" class="hidden button px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700">
+                Export to CSV
             </button>
         </div>
 
@@ -371,17 +273,6 @@
         <div id="results-container" class="space-y-4">
             <!-- Search results will be displayed here -->
         </div>
-
-        <div class="text-center mt-6 flex justify-center space-x-4">
-            <button id="export-button" class="button px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 hidden">
-                Export List
-            </button>
-            <button id="clear-button" class="button px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 hidden">
-                Clear List
-            </button>
-        </div>
-        
-        <p id="user-id-display" class="mt-8 text-center text-sm text-gray-500"></p>
     </div>
 
 </body>
