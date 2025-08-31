@@ -46,7 +46,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
     </style>
-    <script type="module">
+    <script>
         const resultsContainer = document.getElementById('results-container');
         const searchInput = document.getElementById('search-input');
         const searchButton = document.getElementById('search-button');
@@ -55,8 +55,6 @@
         const loadingSpinner = document.getElementById('loading-spinner');
         const statusMessage = document.getElementById('status-message');
         
-        // This is the Google Places API key you provided.
-        const GOOGLE_PLACES_API_KEY = "AIzaSyAyh7Ik2dnRJsgwvBtiKX-rYCOyLOEjWsM"; 
         let salonData = []; // To store results for export
 
         /**
@@ -86,47 +84,42 @@
         };
 
         /**
-         * Searches for salons using the Google Places Text Search API.
+         * Searches for salons using a server-side search tool to bypass CORS issues.
          * @param {string} city The city to search for.
          */
         const searchSalons = async (city) => {
             try {
-                // Construct the Google Places Text Search URL
-                const query = `hair salons in ${city}`;
-                const apiUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${GOOGLE_PLACES_API_KEY}`;
-                
-                // Fetch the data from the Google Places API
-                const response = await fetch(apiUrl);
-                
-                if (!response.ok) {
-                    throw new Error(`API call failed with status ${response.status}`);
-                }
+                // Use a server-side search tool to avoid CORS issues
+                const payload = {
+                    queries: [`hair salons in ${city}`]
+                };
 
-                const data = await response.json();
-                
-                // Check for API-level errors
-                if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-                    throw new Error(`Google Places API error: ${data.status}`);
-                }
+                const response = await google_search.search(payload);
 
-                // Map the results to our data structure
-                salonData = data.results.map(place => ({
-                    name: place.name || 'N/A',
-                    address: place.formatted_address || 'N/A',
-                    phone: place.formatted_phone_number || 'N/A',
-                    website: place.website || 'N/A' 
-                }));
-                
-                displayResults(salonData);
-                
-                if (salonData.length > 0) {
-                    exportButton.classList.remove('hidden');
-                    clearButton.classList.remove('hidden');
-                    updateStatus(`Search complete! Found ${salonData.length} salons in ${city}.`, false);
+                if (response && response.results && response.results.length > 0) {
+                    const searchResult = response.results[0];
+                    const places = JSON.parse(searchResult.organic_results);
+
+                    salonData = places.map(place => ({
+                        name: place.name || 'N/A',
+                        address: place.address || 'N/A',
+                        phone: place.phone || 'N/A',
+                        website: place.website || 'N/A'
+                    }));
+
+                    displayResults(salonData);
+
+                    if (salonData.length > 0) {
+                        exportButton.classList.remove('hidden');
+                        clearButton.classList.remove('hidden');
+                        updateStatus(`Search complete! Found ${salonData.length} salons in ${city}.`, false);
+                    } else {
+                        exportButton.classList.add('hidden');
+                        clearButton.classList.add('hidden');
+                        updateStatus(`Search complete! Found no salons in ${city}.`, false);
+                    }
                 } else {
-                    exportButton.classList.add('hidden');
-                    clearButton.classList.add('hidden');
-                    updateStatus(`Search complete! Found no salons in ${city}.`, false);
+                    throw new Error("No search results found.");
                 }
 
             } catch (error) {
@@ -134,7 +127,7 @@
                 updateStatus(`An unexpected error occurred during the search: ${error.message}.`, false);
             }
         };
-        
+
         /**
          * Displays the search results in the UI.
          * @param {Array<Object>} results The array of salon objects to display.
@@ -159,7 +152,7 @@
                 resultsContainer.appendChild(salonCard);
             });
         };
-        
+
         /**
          * Exports the current salon data to a CSV file.
          */
@@ -168,10 +161,10 @@
                 updateStatus('No data to export.', false);
                 return;
             }
-            
+
             const headers = ["Name", "Address", "Phone", "Website"];
             const csvRows = [headers.join(',')];
-            
+
             salonData.forEach(salon => {
                 const row = headers.map(header => {
                     const value = salon[header.toLowerCase()] || '';
@@ -180,18 +173,18 @@
                 });
                 csvRows.push(row.join(','));
             });
-            
+
             const csvString = csvRows.join('\n');
             const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
-            
+
             link.href = URL.createObjectURL(blob);
             link.download = 'hair_salons.csv';
-            
+
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
+
             updateStatus('CSV file exported successfully!', false);
         };
 
@@ -205,12 +198,12 @@
             updateStatus('Searching...', true);
             searchSalons(cityInput);
         });
-        
+
         exportButton.addEventListener('click', exportToCsv);
         clearButton.addEventListener('click', clearResults);
 
         window.onload = () => {
-          updateStatus('Enter a city and click Search.', false);
+            updateStatus('Enter a city and click Search.', false);
         };
 
     </script>
